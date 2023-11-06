@@ -49,6 +49,7 @@ func (a *ACL) Load(fsPath string, attr ACLAttr) error {
 	return a.parse(attrValue)
 }
 
+// bootstrapACL loads the regular file permissions as ACL entries
 func (a *ACL) bootstrapACL(fsPath string) error {
 	var err error
 	// no acl exists, so lets create a default one
@@ -173,7 +174,7 @@ func (a *ACL) String() string {
 		sb.WriteString("\n")
 	}
 
-	return fmt.Sprintf("ACL:\n-----\nVersion: %d\nEntries:\n%s\n", a.version, sb.String())
+	return fmt.Sprintf("Version: %d\nEntries:\n%s\n", a.version, sb.String())
 }
 
 // sort Sorts the ACLEntries stored in a.entries
