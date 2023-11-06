@@ -1,11 +1,14 @@
-package main
+package acls
 
 import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"math"
+	"os"
 	"sort"
 	"strings"
+	"syscall"
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
@@ -18,6 +21,47 @@ const (
 	PosixACLDefault ACLAttr = "system.posix_acl_default"
 )
 
+type Tag uint16
+
+const (
+	// Undefined ACL type.
+	TAG_ACL_UNDEFINED_FIELD = 0x0
+	// Discretionary access rights for
+	//processes whose effective user ID
+	//matches the user ID of the file's owner.
+	TAG_ACL_USER_OBJ = 0x1
+	// Discretionary access rights for
+	// processes whose effective user ID
+	// matches the ACL entry qualifier.
+	TAG_ACL_USER = 0x2
+	// Discretionary access rights for
+	// processes whose effective groupID or
+	// any supplemental groups match the group
+	// ID of the file's owner.
+	TAG_ACL_GROUP_OBJ = 0x4
+	// Discretionary access rights for
+	// processes whose effective group ID or
+	// any supplemental groups match the ACL
+	// entry qualifier.
+	TAG_ACL_GROUP = 0x8
+	// The maximum discretionary access rights
+	// that can be granted to a process in the
+	// file group class. This is only valid
+	// for POSIX.1e ACLs.
+	TAG_ACL_MASK = 0x10
+	// Discretionary access rights for
+	// processes not covered by any other ACL
+	// entry. This is only valid for POSIX.1e
+	// ACLs.
+	TAG_ACL_OTHER = 0x20
+	// Same as ACL_OTHER.
+	TAG_ACL_OTHER_OBJ = TAG_ACL_OTHER
+	// Discretionary access rights for all
+	// users. This is only valid for NFSv4
+	// ACLs.
+	TAG_ACL_EVERYONE = 0x40
+)
+
 // ACL handles Posix ACL data
 type ACL struct {
 	version uint32
@@ -27,28 +71,58 @@ type ACL struct {
 // Load loads the attr defined POSIX.ACL type (access or default)
 // from the given filepath
 func (a *ACL) Load(fsPath string, attr ACLAttr) error {
-	// Get the ACL as an extended attribute.
-	attrSize, err := unix.Getxattr(fsPath, string(attr), nil)
-	if err != nil {
-		log.Error(err)
-	}
-
 	a.entries = []*ACLEntry{}
 	a.version = 2
 
-	if attrSize == -1 {
-		return nil
+	// Get the ACL as an extended attribute.
+	attrSize, err := unix.Getxattr(fsPath, string(attr), nil)
+	switch {
+	case err == unix.ENODATA:
+		// there is not acl attached to the fsPath object
+		// so bootstrap it with regular chown type of information
+		return a.bootstrapACL(fsPath)
+	case err != nil:
+		return err
 	}
+
 	// Allocate a buffer to hold the ACL data.
 	attrValue := make([]byte, attrSize)
 
 	// Retrieve the ACL data.
 	_, err = unix.Getxattr(fsPath, string(attr), attrValue)
 	if err != nil {
-		log.Error(err)
+		return err
 	}
 
 	return a.parse(attrValue)
+}
+
+func (a *ACL) bootstrapACL(fsPath string) error {
+	var err error
+	// no acl exists, so lets create a default one
+	info, err := os.Stat(fsPath)
+	if err != nil {
+		return err
+	}
+
+	// determine UID and GID of fsPath
+	file_sys := info.Sys()
+	if file_sys == nil {
+		return fmt.Errorf("error determining file %q UID and GID", fsPath)
+	}
+	Gid := file_sys.(*syscall.Stat_t).Gid
+	Uid := file_sys.(*syscall.Stat_t).Uid
+
+	// determine permissions
+	perm := info.Mode().Perm()
+	UserEntry := NewEntry(TAG_ACL_USER_OBJ, Uid, uint16((perm>>6)&7))
+	GroupEntry := NewEntry(TAG_ACL_GROUP_OBJ, Gid, uint16((perm>>3)&7))
+	MaskEntry := NewEntry(TAG_ACL_MASK, math.MaxUint16, uint16(7))
+	OtherEntry := NewEntry(TAG_ACL_OTHER, math.MaxUint16, uint16(perm&7))
+
+	// add newly created entries to the entries.
+	a.entries = append(a.entries, UserEntry, GroupEntry, OtherEntry, MaskEntry)
+	return nil
 }
 
 // Apply applies the ACL with its ACLEntries to as
@@ -163,9 +237,18 @@ func (a *ACL) sort() {
 //   - perm is the permission in its numerical format
 //   - id is the id of the group or user or whatever tag points to
 type ACLEntry struct {
-	tag  uint16
+	tag  Tag
 	perm uint16
 	id   uint32
+}
+
+// NewEntry returns a new ACLEntry
+func NewEntry(tag Tag, id uint32, perm uint16) *ACLEntry {
+	return &ACLEntry{
+		tag:  tag,
+		perm: perm,
+		id:   id,
+	}
 }
 
 // parse parses a single ACLEntry from the given byte slice.
@@ -176,7 +259,7 @@ func (a *ACLEntry) parse(b []byte) ([]byte, error) {
 	if len(b) < 8 {
 		return nil, fmt.Errorf("malformed data")
 	}
-	a.tag = binary.LittleEndian.Uint16(b[:2])
+	a.tag = Tag(binary.LittleEndian.Uint16(b[:2]))
 	a.perm = binary.LittleEndian.Uint16(b[2:4])
 	a.id = binary.LittleEndian.Uint32(b[4:8])
 	return b[8:], nil
