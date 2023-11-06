@@ -16,37 +16,35 @@ Then the ACL is applied as an Access ACL to the `filePath` provided filesystem o
 package main
 
 import (
-	log "github.com/sirupsen/logrus"
-	"github.com/steiler/acls"
+  log "github.com/sirupsen/logrus"
+  "github.com/steiler/acls"
 )
 
 func main() {
-
-	// Define the path to the file for which you want to get ACLs.
-	filePath := "/tmp/foo"
+    // Define the path to the file for which you want to get ACLs.
+    filePath := "/tmp/foo"
 
     // init the ACL struct
-	a := &acls.ACL{}
+    a := &acls.ACL{}
     // load (access) ACL entries from a given path object
-	err := a.Load(filePath, acls.PosixACLAccess)
-	if err != nil {
-		log.Fatal(err)
-	}
+    err := a.Load(filePath, acls.PosixACLAccess)
+    if err != nil {
+        log.Fatal(err)
+    }
     // add a new entry referencing a group with GID 5558 granting permission rwx (7)
-	err = a.AddEntry(acls.NewEntry(acls.TAG_ACL_GROUP, 5558, 7))
-	if err != nil {
-		log.Fatal(err)
-	}
+    err = a.AddEntry(acls.NewEntry(acls.TAG_ACL_GROUP, 5558, 7))
+    if err != nil {
+        log.Fatal(err)
+    }
     // print a visual representation of the ACL
     fmt.Println(a.String())
 
     // Apply the ACL as an access ACL to the given filesystem path object.
-	err = a.Apply(filePath, acls.PosixACLAccess)
-	if err != nil {
-		log.Fatal(err)
-	}
+    err = a.Apply(filePath, acls.PosixACLAccess)
+    if err != nil {
+        log.Fatal(err)
+    }
 }
-
 ```
 
 The output of the `fmt.Println(a.String())` looks like the following:
