@@ -69,8 +69,8 @@ func (a *ACL) bootstrapACL(fsPath string) error {
 	perm := info.Mode().Perm()
 	UserEntry := NewEntry(TAG_ACL_USER_OBJ, Uid, uint16((perm>>6)&7))
 	GroupEntry := NewEntry(TAG_ACL_GROUP_OBJ, Gid, uint16((perm>>3)&7))
-	MaskEntry := NewEntry(TAG_ACL_MASK, math.MaxUint16, uint16(7))
-	OtherEntry := NewEntry(TAG_ACL_OTHER, math.MaxUint16, uint16(perm&7))
+	MaskEntry := NewEntry(TAG_ACL_MASK, math.MaxUint32, uint16(7))
+	OtherEntry := NewEntry(TAG_ACL_OTHER, math.MaxUint32, uint16(perm&7))
 
 	// add newly created entries to the entries.
 	a.entries = append(a.entries, UserEntry, GroupEntry, OtherEntry, MaskEntry)
@@ -165,6 +165,8 @@ func (a *ACL) parse(b []byte) error {
 // String returns a human readable for of the ACL
 func (a *ACL) String() string {
 	sb := &strings.Builder{}
+	// sort before generating
+	a.sort()
 
 	for _, e := range a.entries {
 		sb.WriteString(e.String())

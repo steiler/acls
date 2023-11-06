@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"strings"
 )
 
 // ACLEntry the ACLEntry represents the single lines
@@ -42,7 +43,7 @@ func (a *ACLEntry) parse(b []byte) ([]byte, error) {
 
 // String returns a string representation of the ACLEntry
 func (a *ACLEntry) String() string {
-	return fmt.Sprintf("Tag: %d, ID: %d, Perm: %d", a.tag, a.id, a.perm)
+	return fmt.Sprintf("Tag: %10s (%2d), ID: %10d, Perm: %s (%d)", Tag2String(a.tag), a.tag, a.id, PermUintToString(a.perm), a.perm)
 }
 
 // equalTagID returns true if the given ACLEntry carries
@@ -65,4 +66,22 @@ func (a *ACLEntry) ToByteSlice(result *bytes.Buffer) {
 	binary.Write(result, binary.LittleEndian, a.tag)
 	binary.Write(result, binary.LittleEndian, a.perm)
 	binary.Write(result, binary.LittleEndian, a.id)
+}
+
+// PermUintToString takes an int representation of a
+// permission and returns the string representation "rwx".
+// not granted permissions appear as "-".
+func PermUintToString(p uint16) string {
+	s := []string{"-", "-", "-"}
+
+	if (p & 0x4) == 0x4 {
+		s[0] = "r"
+	}
+	if (p & 0x2) == 0x2 {
+		s[1] = "w"
+	}
+	if (p & 0x1) == 0x1 {
+		s[2] = "x"
+	}
+	return strings.Join(s, "")
 }

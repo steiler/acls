@@ -47,3 +47,26 @@ const (
 	// ACLs.
 	TAG_ACL_EVERYONE = 0x40
 )
+
+func Tag2String(i Tag) string {
+	result := "undefined"
+	switch i {
+	case 0x0:
+		// undefiend
+	case 0x1:
+		result = "USER_OBJ"
+	case 0x2:
+		result = "USER"
+	case 0x4:
+		result = "GROUP_OBJ"
+	case 0x8:
+		result = "GROUP"
+	case 0x10:
+		result = "MASK"
+	case 0x20, 0x30:
+		result = "OTHER"
+	case 0x40:
+		result = "EVERYONE"
+	}
+	return result
+}
