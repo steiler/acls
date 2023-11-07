@@ -121,9 +121,9 @@ func (a *ACL) DeleteEntry(e *ACLEntry) *ACLEntry {
 // deleteEntryPos delete the entry at a given position
 // used internally
 func (a *ACL) deleteEntryPos(pos int) *ACLEntry {
-	tmp := a.entries
-	a.entries = append(tmp[:pos], tmp[pos+1:]...)
-	return tmp[pos]
+	result := a.entries[pos]
+	a.entries = append(a.entries[:pos], a.entries[pos+1:]...)
+	return result
 }
 
 // EntryExists checks if an entry with the given Tag and ID already exist

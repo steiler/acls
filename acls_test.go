@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"os/user"
+	"reflect"
 	"strconv"
 	"testing"
 )
@@ -498,5 +499,64 @@ func TestLoadApplyLoad(t *testing.T) {
 	err = os.Remove(f.Name())
 	if err != nil {
 		t.Errorf("failed removing temp file %s", f.Name())
+	}
+}
+
+func TestACL_DeleteEntry(t *testing.T) {
+
+	tests := []struct {
+		name          string
+		acl           *ACL
+		deleteEntry   *ACLEntry // tag and id must match the one on the acl
+		deletedEntry  *ACLEntry // is the one deleted from the ACL
+		shouldSucceed bool
+	}{
+		{
+			name: "Delete an entry",
+			acl: &ACL{
+				version: 2,
+				entries: []*ACLEntry{
+					unsortedACLEntries[0],
+					unsortedACLEntries[1],
+					unsortedACLEntries[2],
+					unsortedACLEntries[3],
+					unsortedACLEntries[4],
+				},
+			},
+			deleteEntry:   NewEntry(unsortedACLEntries[2].tag, unsortedACLEntries[2].id, unsortedACLEntries[2].perm),
+			deletedEntry:  unsortedACLEntries[2],
+			shouldSucceed: true,
+		},
+		{
+			name: "Delete non-existing",
+			acl: &ACL{
+				version: 2,
+				entries: []*ACLEntry{
+					unsortedACLEntries[0],
+					unsortedACLEntries[1],
+					unsortedACLEntries[2],
+					unsortedACLEntries[3],
+					unsortedACLEntries[4],
+				},
+			},
+			deleteEntry:   NewEntry(TAG_ACL_GROUP, 32456, 7),
+			deletedEntry:  nil,
+			shouldSucceed: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			preLen := len(tt.acl.entries)
+
+			if got := tt.acl.DeleteEntry(tt.deleteEntry); !reflect.DeepEqual(got, tt.deletedEntry) {
+				t.Errorf("ACL.DeleteEntry() = %v, want %v", got, tt.deletedEntry)
+			}
+			if tt.shouldSucceed {
+				if preLen-1 != len(tt.acl.entries) {
+					t.Errorf("expected %d entries after delete, got %d", preLen-1, len(tt.acl.entries))
+				}
+			}
+		})
 	}
 }
