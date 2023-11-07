@@ -82,13 +82,13 @@ func (a *ACL) bootstrapACL(fsPath string) error {
 // either access or default ACLs to the given filesstem path
 func (a *ACL) Apply(fsPath string, attr ACLAttr) error {
 	b := &bytes.Buffer{}
-	a.toByteSlice(b)
+	a.ToByteSlice(b)
 	return unix.Setxattr(fsPath, string(attr), b.Bytes(), 0)
 }
 
-// toByteSlice return the ACL in its byte slice representation
+// ToByteSlice return the ACL in its byte slice representation
 // read to be used by Setxattr(...)
-func (a *ACL) toByteSlice(result *bytes.Buffer) {
+func (a *ACL) ToByteSlice(result *bytes.Buffer) {
 	a.sort()
 	binary.Write(result, binary.LittleEndian, a.version)
 	for _, e := range a.entries {
@@ -138,6 +138,19 @@ func (a *ACL) EntryExists(e *ACLEntry) int {
 	return -1
 }
 
+// Equal returns true if the given ACL equals the actual ACL
+func (a *ACL) Equal(e *ACL) bool {
+	if !(len(a.entries) == len(e.entries) && a.version == e.version) {
+		return false
+	}
+	for id, val := range a.entries {
+		if !val.Equal(e.entries[id]) {
+			return false
+		}
+	}
+	return true
+}
+
 // parse parses the byte slice that contains the ACLEntries
 // and add them to a.entries.
 func (a *ACL) parse(b []byte) error {
@@ -174,7 +187,7 @@ func (a *ACL) String() string {
 		sb.WriteString("\n")
 	}
 
-	return fmt.Sprintf("Version: %d\nEntries:\n%s\n", a.version, sb.String())
+	return fmt.Sprintf("Version: %d\nEntries:\n%s", a.version, sb.String())
 }
 
 // sort Sorts the ACLEntries stored in a.entries

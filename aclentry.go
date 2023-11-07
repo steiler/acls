@@ -59,6 +59,11 @@ func (a *ACLEntry) equalTagID(e *ACLEntry) bool {
 	return true
 }
 
+// Equal returns true if the given ACLEntry equals the actual ACLEntry
+func (a *ACLEntry) Equal(e *ACLEntry) bool {
+	return a.id == e.id && a.tag == e.tag && a.perm == e.perm
+}
+
 // ToByteSlice returns the ACLEntry as a byte slice in
 // little endian order, which is the representation required
 // for the Setxattr(...) call
