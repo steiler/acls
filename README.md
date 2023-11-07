@@ -1,3 +1,5 @@
+[![codecov](https://codecov.io/gh/steiler/acls/graph/badge.svg?token=5DQWBVKCU3)](https://codecov.io/gh/steiler/acls)
+
 # Overview
 This library provides the means to, without any cgo dependencies, adjust the regular linux filesystem ACLs (`system.posix_acl_access`) as well as the default ACLs (`system.posix_acl_default`).
 It therefore is a golang native implementation of the getfacl / setfacl commands.

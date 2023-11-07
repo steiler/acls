@@ -399,7 +399,7 @@ func TestACL_Load(t *testing.T) {
 	if err != nil {
 		t.Errorf("error converting UID %s to int", u.Uid)
 	}
-	GID, err := strconv.Atoi(u.Uid)
+	GID, err := strconv.Atoi(u.Gid)
 	if err != nil {
 		t.Errorf("error converting GID %s to int", u.Gid)
 	}
