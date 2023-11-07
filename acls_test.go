@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"encoding/hex"
 	"math"
+	"os"
+	"os/user"
+	"strconv"
 	"testing"
 )
 
@@ -156,9 +159,16 @@ func TestACL_parse(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "input to short",
+			name: "input to short ACL",
 			args: args{
 				s: "0200",
+			},
+			wantErr: true,
+		},
+		{
+			name: "input to short ACLEntry",
+			args: args{
+				s: "0200000001000700ff",
 			},
 			wantErr: true,
 		},
@@ -291,5 +301,202 @@ func TestACL_AddEntry(t *testing.T) {
 				t.Errorf("expected entry\n%s not found", tt.addEntry.String())
 			}
 		})
+	}
+}
+
+func TestACL_Equal(t *testing.T) {
+	tests := []struct {
+		name   string
+		ACLOne *ACL
+		ACLTwo *ACL
+		want   bool
+	}{
+		{
+			name: "Equal",
+			want: true,
+			ACLOne: &ACL{
+				version: 2,
+				entries: unsortedACLEntries,
+			},
+			ACLTwo: &ACL{
+				version: 2,
+				entries: unsortedACLEntries,
+			},
+		},
+		{
+			name: "Not Equal same length",
+			want: false,
+			ACLOne: &ACL{
+				version: 2,
+				entries: []*ACLEntry{
+					unsortedACLEntries[0],
+					unsortedACLEntries[1],
+					unsortedACLEntries[2],
+				},
+			},
+			ACLTwo: &ACL{
+				version: 2,
+				entries: []*ACLEntry{
+					unsortedACLEntries[0],
+					unsortedACLEntries[1],
+					unsortedACLEntries[3],
+				},
+			},
+		},
+		{
+			name: "Same entries different order",
+			want: false,
+			ACLOne: &ACL{
+				version: 2,
+				entries: []*ACLEntry{
+					unsortedACLEntries[0],
+					unsortedACLEntries[1],
+					unsortedACLEntries[2],
+				},
+			},
+			ACLTwo: &ACL{
+				version: 2,
+				entries: []*ACLEntry{
+					unsortedACLEntries[0],
+					unsortedACLEntries[2],
+					unsortedACLEntries[1],
+				},
+			},
+		},
+		{
+			name: "Different Version",
+			want: false,
+			ACLOne: &ACL{
+				version: 3,
+				entries: []*ACLEntry{
+					unsortedACLEntries[0],
+				},
+			},
+			ACLTwo: &ACL{
+				version: 2,
+				entries: []*ACLEntry{
+					unsortedACLEntries[0],
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.ACLOne.Equal(tt.ACLTwo); got != tt.want {
+				t.Errorf("ACL.Equal() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestACL_Load(t *testing.T) {
+	u, err := user.Current()
+	if err != nil {
+		t.Errorf("error determining user and group")
+	}
+	UID, err := strconv.Atoi(u.Uid)
+	if err != nil {
+		t.Errorf("error converting UID %s to int", u.Uid)
+	}
+	GID, err := strconv.Atoi(u.Uid)
+	if err != nil {
+		t.Errorf("error converting GID %s to int", u.Gid)
+	}
+
+	tests := []struct {
+		name     string
+		wantErr  bool
+		attr     ACLAttr
+		result   *ACL
+		entryLen int
+	}{
+		{
+			name:    "Load non acl",
+			wantErr: false,
+			attr:    PosixACLAccess,
+			result: &ACL{
+				version: 2,
+				entries: []*ACLEntry{
+					NewEntry(TAG_ACL_USER_OBJ, uint32(UID), 6),
+					NewEntry(TAG_ACL_GROUP_OBJ, uint32(GID), 0),
+					NewEntry(TAG_ACL_MASK, math.MaxUint32, 7),
+					NewEntry(TAG_ACL_OTHER, math.MaxUint32, 0),
+				},
+			},
+			entryLen: 4,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			f, err := os.CreateTemp("", "acltest")
+			if err != nil {
+				t.Errorf("failed to create directory for testing")
+			}
+
+			a := &ACL{}
+			if err := a.Load(f.Name(), tt.attr); (err != nil) != tt.wantErr {
+				t.Errorf("ACL.Load() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr {
+				// we wanted an error so lets not check the result any further
+				return
+			}
+			if len(a.entries) != tt.entryLen {
+				t.Errorf("expected %d entries got %d", tt.entryLen, len(a.entries))
+			}
+			tt.result.sort()
+			a.sort()
+			if !a.Equal(tt.result) {
+				t.Errorf("expected %s, got %s", tt.result.String(), a.String())
+			}
+			err = f.Close()
+			if err != nil {
+				t.Errorf("failed closing temp file %s: %v", f.Name(), err)
+			}
+			err = os.Remove(f.Name())
+			if err != nil {
+				t.Errorf("failed removing temp file %s: %v", f.Name(), err)
+			}
+		})
+	}
+}
+
+func TestLoadApplyLoad(t *testing.T) {
+	// create a tmp file
+	f, err := os.CreateTemp("", "acltest")
+	if err != nil {
+		t.Errorf("failed to create directory for testing %v", err)
+	}
+
+	// init new acl
+	a := &ACL{}
+	// load ACL
+	err = a.Load(f.Name(), PosixACLAccess)
+	if err != nil {
+		t.Errorf("failed loading ACL %v", err)
+	}
+
+	err = a.Apply(f.Name(), PosixACLAccess)
+	if err != nil {
+		t.Errorf("failed applying acl to %q: %v", f.Name(), err)
+	}
+
+	// reload updated policy
+	err = a.Load(f.Name(), PosixACLAccess)
+	if err != nil {
+		t.Errorf("failed loading ACL %v", err)
+	}
+
+	// close the file
+	err = f.Close()
+	if err != nil {
+		t.Errorf("failed closing temp file %s", f.Name())
+	}
+	// remove the tmp file
+	err = os.Remove(f.Name())
+	if err != nil {
+		t.Errorf("failed removing temp file %s", f.Name())
 	}
 }
