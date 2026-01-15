@@ -16,15 +16,15 @@ import (
 
 // ACL handles Posix ACL data
 type ACL struct {
-	version uint32
-	entries []*ACLEntry
+	Version uint32
+	Entries []*ACLEntry
 }
 
 // Load loads the attr defined POSIX.ACL type (access or default)
 // from the given filepath
 func (a *ACL) Load(fsPath string, attr ACLAttr) error {
-	a.entries = []*ACLEntry{}
-	a.version = 2
+	a.Entries = []*ACLEntry{}
+	a.Version = 2
 
 	// Get the ACL as an extended attribute.
 	attrSize, err := unix.Getxattr(fsPath, string(attr), nil)
@@ -74,7 +74,7 @@ func (a *ACL) bootstrapACL(fsPath string) error {
 	OtherEntry := NewEntry(TAG_ACL_OTHER, math.MaxUint32, uint16(perm&7))
 
 	// add newly created entries to the entries.
-	a.entries = append(a.entries, UserEntry, GroupEntry, OtherEntry, MaskEntry)
+	a.Entries = append(a.Entries, UserEntry, GroupEntry, OtherEntry, MaskEntry)
 	return nil
 }
 
@@ -90,8 +90,8 @@ func (a *ACL) Apply(fsPath string, attr ACLAttr) error {
 // read to be used by Setxattr(...)
 func (a *ACL) ToByteSlice(result *bytes.Buffer) {
 	a.sort()
-	binary.Write(result, binary.LittleEndian, a.version)
-	for _, e := range a.entries {
+	binary.Write(result, binary.LittleEndian, a.Version)
+	for _, e := range a.Entries {
 		e.ToByteSlice(result)
 	}
 }
@@ -105,7 +105,7 @@ func (a *ACL) AddEntry(e *ACLEntry) error {
 	if deleted != nil {
 		log.Debugf("Existing entry %q deleted", deleted.String())
 	}
-	a.entries = append(a.entries, e)
+	a.Entries = append(a.Entries, e)
 	return nil
 }
 
@@ -121,8 +121,8 @@ func (a *ACL) DeleteEntry(e *ACLEntry) *ACLEntry {
 // deleteEntryPos delete the entry at a given position
 // used internally
 func (a *ACL) deleteEntryPos(pos int) *ACLEntry {
-	result := a.entries[pos]
-	a.entries = append(a.entries[:pos], a.entries[pos+1:]...)
+	result := a.Entries[pos]
+	a.Entries = append(a.Entries[:pos], a.Entries[pos+1:]...)
 	return result
 }
 
@@ -130,7 +130,7 @@ func (a *ACL) deleteEntryPos(pos int) *ACLEntry {
 // if so it return -1 of not the position of the duplicate is returned as
 // a positive int
 func (a *ACL) EntryExists(e *ACLEntry) int {
-	for pos, entry := range a.entries {
+	for pos, entry := range a.Entries {
 		if entry.equalTagID(e) {
 			return pos
 		}
@@ -140,11 +140,14 @@ func (a *ACL) EntryExists(e *ACLEntry) int {
 
 // Equal returns true if the given ACL equals the actual ACL
 func (a *ACL) Equal(e *ACL) bool {
-	if !(len(a.entries) == len(e.entries) && a.version == e.version) {
+	if !(len(a.Entries) == len(e.Entries) && a.Version == e.Version) {
 		return false
 	}
-	for id, val := range a.entries {
-		if !val.Equal(e.entries[id]) {
+	// sort before comparing
+	a.sort()
+	e.sort()
+	for id, val := range a.Entries {
+		if !val.Equal(e.Entries[id]) {
 			return false
 		}
 	}
@@ -152,12 +155,12 @@ func (a *ACL) Equal(e *ACL) bool {
 }
 
 // parse parses the byte slice that contains the ACLEntries
-// and add them to a.entries.
+// and add them to a.Entries.
 func (a *ACL) parse(b []byte) error {
 	if len(b) < 4 {
 		return fmt.Errorf("expecting at least a 32 bit header, got %d", len(b)*4)
 	}
-	a.version = binary.LittleEndian.Uint32(b[:4])
+	a.Version = binary.LittleEndian.Uint32(b[:4])
 
 	remainder := b[4:]
 	var err error
@@ -167,7 +170,7 @@ func (a *ACL) parse(b []byte) error {
 		if err != nil {
 			return err
 		}
-		a.entries = append(a.entries, e)
+		a.Entries = append(a.Entries, e)
 		if len(remainder) == 0 {
 			break
 		}
@@ -182,19 +185,32 @@ func (a *ACL) String() string {
 	// sort before generating
 	a.sort()
 
-	for _, e := range a.entries {
+	for _, e := range a.Entries {
 		sb.WriteString(e.String())
 		sb.WriteString("\n")
 	}
 
-	return fmt.Sprintf("Version: %d\nEntries:\n%s", a.version, sb.String())
+	return fmt.Sprintf("Version: %d\nEntries:\n%s", a.Version, sb.String())
 }
 
-// sort Sorts the ACLEntries stored in a.entries
+// sort Sorts the ACLEntries stored in a.Entries
 // by their tag number. To apply the ACL the tags ned to
 // be in ascending order
 func (a *ACL) sort() {
-	sort.Slice(a.entries, func(i, j int) bool {
-		return a.entries[i].tag < a.entries[j].tag
+	sort.Slice(a.Entries, func(i, j int) bool {
+		return a.Entries[i].Tag < a.Entries[j].Tag
 	})
+}
+
+// copy returns a copy of the ACL
+func (a *ACL) Copy() *ACL {
+	c := ACL{Version: a.Version}
+	c.Entries = make([]*ACLEntry, len(a.Entries))
+
+	for i, e := range a.Entries {
+		d := *e
+		c.Entries[i] = &d
+	}
+
+	return &c
 }

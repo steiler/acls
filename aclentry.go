@@ -9,21 +9,21 @@ import (
 
 // ACLEntry the ACLEntry represents the single lines
 // of permission.
-//   - tag references the type (group, user, etc.)
-//   - perm is the permission in its numerical format
-//   - id is the id of the group or user or whatever tag points to
+//   - Tag references the type (group, user, etc.)
+//   - Perm is the permission in its numerical format
+//   - Id is the id of the group or user or whatever tag points to
 type ACLEntry struct {
-	tag  Tag
-	perm uint16
-	id   uint32
+	Tag  Tag
+	Perm uint16
+	Id   uint32
 }
 
 // NewEntry returns a new ACLEntry
 func NewEntry(tag Tag, id uint32, perm uint16) *ACLEntry {
 	return &ACLEntry{
-		tag:  tag,
-		perm: perm,
-		id:   id,
+		Tag:  tag,
+		Perm: perm,
+		Id:   id,
 	}
 }
 
@@ -35,25 +35,25 @@ func (a *ACLEntry) parse(b []byte) ([]byte, error) {
 	if len(b) < 8 {
 		return nil, fmt.Errorf("malformed data")
 	}
-	a.tag = Tag(binary.LittleEndian.Uint16(b[:2]))
-	a.perm = binary.LittleEndian.Uint16(b[2:4])
-	a.id = binary.LittleEndian.Uint32(b[4:8])
+	a.Tag = Tag(binary.LittleEndian.Uint16(b[:2]))
+	a.Perm = binary.LittleEndian.Uint16(b[2:4])
+	a.Id = binary.LittleEndian.Uint32(b[4:8])
 	return b[8:], nil
 }
 
 // String returns a string representation of the ACLEntry
 func (a *ACLEntry) String() string {
-	return fmt.Sprintf("Tag: %10s (%2d), ID: %10d, Perm: %s (%d)", Tag2String(a.tag), a.tag, a.id, PermUintToString(a.perm), a.perm)
+	return fmt.Sprintf("Tag: %10s (%2d), ID: %10d, Perm: %s (%d)", Tag2String(a.Tag), a.Tag, a.Id, PermUintToString(a.Perm), a.Perm)
 }
 
 // equalTagID returns true if the given ACLEntry carries
 // the same ID and Tag values as actual entry. False otherwise.
-// The perm attribute is not considered in this check.
+// The Perm attribute is not considered in this check.
 func (a *ACLEntry) equalTagID(e *ACLEntry) bool {
-	if e.tag != a.tag {
+	if e.Tag != a.Tag {
 		return false
 	}
-	if e.id != a.id {
+	if e.Id != a.Id {
 		return false
 	}
 	return true
@@ -61,16 +61,16 @@ func (a *ACLEntry) equalTagID(e *ACLEntry) bool {
 
 // Equal returns true if the given ACLEntry equals the actual ACLEntry
 func (a *ACLEntry) Equal(e *ACLEntry) bool {
-	return a.id == e.id && a.tag == e.tag && a.perm == e.perm
+	return a.Id == e.Id && a.Tag == e.Tag && a.Perm == e.Perm
 }
 
 // ToByteSlice returns the ACLEntry as a byte slice in
 // little endian order, which is the representation required
 // for the Setxattr(...) call
 func (a *ACLEntry) ToByteSlice(result *bytes.Buffer) {
-	binary.Write(result, binary.LittleEndian, a.tag)
-	binary.Write(result, binary.LittleEndian, a.perm)
-	binary.Write(result, binary.LittleEndian, a.id)
+	binary.Write(result, binary.LittleEndian, a.Tag)
+	binary.Write(result, binary.LittleEndian, a.Perm)
+	binary.Write(result, binary.LittleEndian, a.Id)
 }
 
 // PermUintToString takes an int representation of a
