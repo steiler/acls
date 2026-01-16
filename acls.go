@@ -117,6 +117,14 @@ func (a *ACL) GetEntry(e *ACLEntry) *ACLEntry {
 	return nil
 }
 
+// GetEntries returns all ACLEntries of the ACL
+func (a *ACL) GetEntries() []*ACLEntry {
+	// copy slice to avoid external modification of the slice itself
+	result := make([]*ACLEntry, len(a.entries))
+	copy(result, a.entries)
+	return result
+}
+
 // DeleteEntry deletes the entry that has the same tag and id
 // if it exists and returns the deleted entry
 func (a *ACL) DeleteEntry(e *ACLEntry) *ACLEntry {

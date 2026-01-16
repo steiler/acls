@@ -692,3 +692,121 @@ func TestGetEntry(t *testing.T) {
 		})
 	}
 }
+
+func TestACL_GetEntries(t *testing.T) {
+	tests := []struct {
+		name      string
+		setupFunc func(*ACL)
+		expectLen int
+	}{
+		{
+			name: "get entries from empty ACL",
+			setupFunc: func(a *ACL) {
+				// no entries added
+			},
+			expectLen: 0,
+		},
+		{
+			name: "get single entry",
+			setupFunc: func(a *ACL) {
+				a.entries = append(a.entries, NewEntry(TAG_ACL_USER, 1000, 6))
+			},
+			expectLen: 1,
+		},
+		{
+			name: "get multiple entries",
+			setupFunc: func(a *ACL) {
+				a.entries = append(a.entries,
+					NewEntry(TAG_ACL_USER_OBJ, math.MaxUint32, 7),
+					NewEntry(TAG_ACL_USER, 1000, 6),
+					NewEntry(TAG_ACL_GROUP, 2000, 5),
+					NewEntry(TAG_ACL_OTHER, math.MaxUint32, 0),
+				)
+			},
+			expectLen: 4,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			acl := &ACL{version: 2}
+			tt.setupFunc(acl)
+
+			entries := acl.GetEntries()
+
+			if entries == nil {
+				t.Errorf("expected non-nil slice, got nil")
+			}
+			if len(entries) != tt.expectLen {
+				t.Errorf("expected %d entries, got %d", tt.expectLen, len(entries))
+			}
+		})
+	}
+}
+
+func TestACL_GetEntries_IsSliceCopy(t *testing.T) {
+	// Specifically test that GetEntries returns a true slice copy
+	acl := &ACL{
+		version: 2,
+		entries: []*ACLEntry{
+			NewEntry(TAG_ACL_USER, 1000, 6),
+			NewEntry(TAG_ACL_GROUP, 2000, 5),
+			NewEntry(TAG_ACL_MASK, math.MaxUint32, 7),
+		},
+	}
+
+	entries1 := acl.GetEntries()
+	entries2 := acl.GetEntries()
+
+	// Both should have same content
+	if len(entries1) != len(entries2) {
+		t.Errorf("two calls to GetEntries have different lengths: %d vs %d", len(entries1), len(entries2))
+	}
+
+	// But they should be different slice objects
+	if &entries1[0] == &entries2[0] {
+		t.Errorf("GetEntries returned references to the same slice, should be copies")
+	}
+
+	// Modifying one should not affect the other
+	entries1 = append(entries1, NewEntry(TAG_ACL_OTHER, math.MaxUint32, 0))
+	if len(entries2) == len(entries1) {
+		t.Errorf("modifying returned slice affected subsequent calls")
+	}
+
+	// Original ACL should still have 3 entries
+	if len(acl.entries) != 3 {
+		t.Errorf("modifications to returned slice affected original ACL")
+	}
+}
+
+func TestACL_GetEntries_AllEntriesPresent(t *testing.T) {
+	// Test that all entries are returned and in accessible form
+	originalEntries := []*ACLEntry{
+		NewEntry(TAG_ACL_USER_OBJ, 1001, 7),
+		NewEntry(TAG_ACL_USER, 2001, 6),
+		NewEntry(TAG_ACL_USER, 2002, 5),
+		NewEntry(TAG_ACL_GROUP_OBJ, 3001, 7),
+		NewEntry(TAG_ACL_GROUP, 3002, 6),
+		NewEntry(TAG_ACL_MASK, math.MaxUint32, 7),
+		NewEntry(TAG_ACL_OTHER, math.MaxUint32, 0),
+	}
+
+	acl := &ACL{
+		version: 2,
+		entries: append([]*ACLEntry{}, originalEntries...),
+	}
+
+	retrieved := acl.GetEntries()
+
+	if len(retrieved) != len(originalEntries) {
+		t.Fatalf("expected %d entries, got %d", len(originalEntries), len(retrieved))
+	}
+
+	// Verify each entry can be compared
+	for i, entry := range originalEntries {
+		if !entry.Equal(retrieved[i]) {
+			t.Errorf("entry %d not equal: expected %v, got %v", i, entry.String(), retrieved[i].String())
+		}
+	}
+}
