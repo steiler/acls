@@ -109,6 +109,14 @@ func (a *ACL) AddEntry(e *ACLEntry) error {
 	return nil
 }
 
+// GetEntry returns the entry with the given Tag and ID if it exists, nil otherwise
+func (a *ACL) GetEntry(e *ACLEntry) *ACLEntry {
+	if pos := a.EntryExists(e); pos >= 0 {
+		return a.entries[pos]
+	}
+	return nil
+}
+
 // DeleteEntry deletes the entry that has the same tag and id
 // if it exists and returns the deleted entry
 func (a *ACL) DeleteEntry(e *ACLEntry) *ACLEntry {
