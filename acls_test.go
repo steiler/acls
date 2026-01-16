@@ -560,3 +560,135 @@ func TestACL_DeleteEntry(t *testing.T) {
 		})
 	}
 }
+
+func TestGetEntry(t *testing.T) {
+	tests := []struct {
+		name       string
+		setupFunc  func(*ACL)
+		searchTag  Tag
+		searchID   uint32
+		expectNil  bool
+		expectPerm uint16
+	}{
+		{
+			name: "get existing user entry",
+			setupFunc: func(a *ACL) {
+				a.entries = append(a.entries, NewEntry(TAG_ACL_USER, 1000, 6))
+			},
+			searchTag:  TAG_ACL_USER,
+			searchID:   1000,
+			expectNil:  false,
+			expectPerm: 6,
+		},
+		{
+			name: "get existing group entry",
+			setupFunc: func(a *ACL) {
+				a.entries = append(a.entries, NewEntry(TAG_ACL_GROUP, 2000, 7))
+			},
+			searchTag:  TAG_ACL_GROUP,
+			searchID:   2000,
+			expectNil:  false,
+			expectPerm: 7,
+		},
+		{
+			name: "get non-existing entry returns nil",
+			setupFunc: func(a *ACL) {
+				a.entries = append(a.entries, NewEntry(TAG_ACL_USER, 1000, 6))
+			},
+			searchTag: TAG_ACL_USER,
+			searchID:  5000,
+			expectNil: true,
+		},
+		{
+			name: "get from empty ACL returns nil",
+			setupFunc: func(a *ACL) {
+				// no entries added
+			},
+			searchTag: TAG_ACL_USER,
+			searchID:  1000,
+			expectNil: true,
+		},
+		{
+			name: "get user entry among multiple different tag types",
+			setupFunc: func(a *ACL) {
+				a.entries = append(a.entries,
+					NewEntry(TAG_ACL_USER_OBJ, math.MaxUint32, 7),
+					NewEntry(TAG_ACL_USER, 1000, 6),
+					NewEntry(TAG_ACL_GROUP, 2000, 5),
+					NewEntry(TAG_ACL_MASK, math.MaxUint32, 7),
+					NewEntry(TAG_ACL_OTHER, math.MaxUint32, 0),
+				)
+			},
+			searchTag:  TAG_ACL_USER,
+			searchID:   1000,
+			expectNil:  false,
+			expectPerm: 6,
+		},
+		{
+			name: "get group entry among multiple different tag types",
+			setupFunc: func(a *ACL) {
+				a.entries = append(a.entries,
+					NewEntry(TAG_ACL_USER_OBJ, math.MaxUint32, 7),
+					NewEntry(TAG_ACL_USER, 1000, 6),
+					NewEntry(TAG_ACL_GROUP, 2000, 5),
+					NewEntry(TAG_ACL_MASK, math.MaxUint32, 7),
+					NewEntry(TAG_ACL_OTHER, math.MaxUint32, 0),
+				)
+			},
+			searchTag:  TAG_ACL_GROUP,
+			searchID:   2000,
+			expectNil:  false,
+			expectPerm: 5,
+		},
+		{
+			name: "get user from multiple user entries with different IDs",
+			setupFunc: func(a *ACL) {
+				a.entries = append(a.entries,
+					NewEntry(TAG_ACL_USER, 1000, 6),
+					NewEntry(TAG_ACL_USER, 1001, 7),
+					NewEntry(TAG_ACL_USER, 1002, 5),
+					NewEntry(TAG_ACL_GROUP, 2000, 4),
+				)
+			},
+			searchTag:  TAG_ACL_USER,
+			searchID:   1001,
+			expectNil:  false,
+			expectPerm: 7,
+		},
+		{
+			name: "get group from multiple group entries with different IDs",
+			setupFunc: func(a *ACL) {
+				a.entries = append(a.entries,
+					NewEntry(TAG_ACL_GROUP, 2000, 6),
+					NewEntry(TAG_ACL_GROUP, 2001, 7),
+					NewEntry(TAG_ACL_GROUP, 2002, 5),
+					NewEntry(TAG_ACL_USER, 1000, 4),
+				)
+			},
+			searchTag:  TAG_ACL_GROUP,
+			searchID:   2002,
+			expectNil:  false,
+			expectPerm: 5,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			acl := &ACL{version: 2}
+			tt.setupFunc(acl)
+
+			searchEntry := NewEntry(tt.searchTag, tt.searchID, 0)
+			result := acl.GetEntry(searchEntry)
+
+			if tt.expectNil && result != nil {
+				t.Errorf("expected nil, got %v", result)
+			}
+			if !tt.expectNil && result == nil {
+				t.Errorf("expected entry, got nil")
+			}
+			if !tt.expectNil && result.perm != tt.expectPerm {
+				t.Errorf("expected perm %d, got %d", tt.expectPerm, result.perm)
+			}
+		})
+	}
+}
