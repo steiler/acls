@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"strings"
 )
 
 // ACLEntry the ACLEntry represents the single lines
@@ -25,6 +24,35 @@ func NewEntry(tag Tag, id uint32, perm uint16) *ACLEntry {
 		perm: perm,
 		id:   id,
 	}
+}
+
+// Tag returns the tag of the ACLEntry
+func (e *ACLEntry) Tag() Tag { return e.tag }
+
+// Perm returns the permission of the ACLEntry
+func (e *ACLEntry) Perm() uint16 { return e.perm }
+
+// ID returns the ID of the ACLEntry
+func (e *ACLEntry) ID() uint32 { return e.id }
+
+// HasPerm checks if the entry has the specified permission bit(s)
+func (e *ACLEntry) HasPerm(perm uint16) bool {
+	return (e.perm & perm) == perm
+}
+
+// WithPerm returns a new ACLEntry with the specified permission bit(s) added
+func (e *ACLEntry) WithPerm(perm uint16) *ACLEntry {
+	return NewEntry(e.tag, e.id, e.perm|perm)
+}
+
+// WithoutPerm returns a new ACLEntry with the specified permission bit(s) removed
+func (e *ACLEntry) WithoutPerm(perm uint16) *ACLEntry {
+	return NewEntry(e.tag, e.id, e.perm&^perm)
+}
+
+// WithExactPerm returns a new ACLEntry with the exact permission specified
+func (e *ACLEntry) WithExactPerm(perm uint16) *ACLEntry {
+	return NewEntry(e.tag, e.id, perm)
 }
 
 // parse parses a single ACLEntry from the given byte slice.
@@ -71,22 +99,4 @@ func (a *ACLEntry) ToByteSlice(result *bytes.Buffer) {
 	binary.Write(result, binary.LittleEndian, a.tag)
 	binary.Write(result, binary.LittleEndian, a.perm)
 	binary.Write(result, binary.LittleEndian, a.id)
-}
-
-// PermUintToString takes an int representation of a
-// permission and returns the string representation "rwx".
-// not granted permissions appear as "-".
-func PermUintToString(p uint16) string {
-	s := []string{"-", "-", "-"}
-
-	if (p & 0x4) == 0x4 {
-		s[0] = "r"
-	}
-	if (p & 0x2) == 0x2 {
-		s[1] = "w"
-	}
-	if (p & 0x1) == 0x1 {
-		s[2] = "x"
-	}
-	return strings.Join(s, "")
 }

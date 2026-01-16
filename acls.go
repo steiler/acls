@@ -20,6 +20,14 @@ type ACL struct {
 	entries []*ACLEntry
 }
 
+// NewACL returns a new ACL instance
+func NewACL() *ACL {
+	return &ACL{
+		version: 2,
+		entries: []*ACLEntry{},
+	}
+}
+
 // Load loads the attr defined POSIX.ACL type (access or default)
 // from the given filepath
 func (a *ACL) Load(fsPath string, attr ACLAttr) error {
