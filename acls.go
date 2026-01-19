@@ -164,6 +164,9 @@ func (a *ACL) EntryExists(e *ACLEntry) int {
 
 // Equal returns true if the given ACL equals the actual ACL
 func (a *ACL) Equal(e *ACL) bool {
+	// sort before comparing
+	a.sort()
+	e.sort()
 	if !(len(a.entries) == len(e.entries) && a.version == e.version) {
 		return false
 	}

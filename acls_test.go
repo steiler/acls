@@ -346,7 +346,7 @@ func TestACL_Equal(t *testing.T) {
 		},
 		{
 			name: "Same entries different order",
-			want: false,
+			want: true,
 			ACLOne: &ACL{
 				version: 2,
 				entries: []*ACLEntry{
