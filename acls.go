@@ -10,7 +10,6 @@ import (
 	"strings"
 	"syscall"
 
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
@@ -109,10 +108,7 @@ func (a *ACL) ToByteSlice(result *bytes.Buffer) {
 // Tag and ID combination exists. If so, it will
 // replace (not merge) the existing entry with the given.
 func (a *ACL) AddEntry(e *ACLEntry) error {
-	deleted := a.DeleteEntry(e)
-	if deleted != nil {
-		log.Debugf("Existing entry %q deleted", deleted.String())
-	}
+	a.DeleteEntry(e)
 	a.entries = append(a.entries, e)
 	return nil
 }
