@@ -3,9 +3,6 @@
 
 name: Go
 
-env:
-  GOVER: 1.20.2
-
 on:
   push:
     branches: [ "master" ]
